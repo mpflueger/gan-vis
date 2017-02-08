@@ -8,7 +8,7 @@ import data2d
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-file', type=str, default='data.csv',
+    parser.add_argument('--data-file', type=str, default='data3.csv',
       help="Training data file")
     parser.add_argument('--log-dir', type=str, default='log',
       help="Directory in which to log training")
