@@ -7,14 +7,16 @@ def weight_variable(shape):
     #initial = tf.truncated_normal(shape, stddev=0.1)
     #return tf.Variable(initial, name='weight')
     return tf.get_variable('weight', shape=shape,
-        initializer=tf.truncated_normal_initializer(stddev=0.1))
+        #initializer=tf.truncated_normal_initializer(stddev=0.1))
+        initializer=tf.contrib.layers.xavier_initializer())
         #initializer=tf.truncated_normal(shape, stddev=0.1))
 
 def bias_variable(shape):
     #initial = tf.constant(0.1, shape=shape)
     #return tf.Variable(initial, name='bias')
     return tf.get_variable('bias', shape=shape,
-        initializer=tf.constant_initializer(0.01))
+        #initializer=tf.constant_initializer(0.01))
+        initializer=tf.contrib.layers.xavier_initializer())
 
 def conv2d(name, x, filter_size, out_channels, stride):
     with tf.variable_scope(name):

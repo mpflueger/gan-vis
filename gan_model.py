@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.colors import Colormap
 import numpy as np
 import tensorflow as tf
 
@@ -22,21 +23,29 @@ class GanModel(object):
         self.beta1 = 0.9
         self.beta2 = 0.999
 
+        # Visualization stuff
+        self.x_grid = np.empty([0,2])
+        for y in np.arange(-2, 2, 0.1):
+            for x in np.arange(-2, 2, 0.1):
+                self.x_grid = np.append(self.x_grid, [[x,y]], axis=0)
+        self.cmap = Colormap('PiYG')
+
         self._create_model()
-        self.saver = tf.train.Saver()
 
     def generator(self, z):
-        fc1 = tf.nn.relu(tfh.fc_layer("gen_fc1", 20, z))
-        fc2 = tf.nn.relu(tfh.fc_layer("gen_fc2", 30, fc1))
+        fc1 = tf.nn.relu(tfh.fc_layer("gen_fc1", 100, z))
+        fc2 = tf.nn.relu(tfh.fc_layer("gen_fc2", 100, fc1))
+        #fc2 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("gen_fc2", 100, fc1)), 0.5)
+        #fc3 = tf.nn.relu(tfh.fc_layer("gen_fc3", 100, fc2))
         x = tfh.fc_layer("gen_out", self.x_dim, fc2)
         return x
 
     def discriminator(self, x, keep_prob):
-        fc1 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc1", 20, x)),
+        fc1 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc1", 30, x)),
                            keep_prob)
         fc2 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc2", 40, fc1)),
                            keep_prob)
-        fc3 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc3", 20, fc2)),
+        fc3 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc3", 30, fc2)),
                            keep_prob)
         y_logit = tfh.fc_layer("desc_out", 1, fc3)
         y_prob = tf.nn.sigmoid(y_logit)
@@ -51,9 +60,9 @@ class GanModel(object):
         with tf.variable_scope('D') as scope:
             self.x = tf.placeholder(tf.float32, shape=[None, self.x_dim])
             self.d_keep_prob = tf.placeholder(tf.float32)
-            self.out_d = self.discriminator(self.x, self.keep_prob)
+            self.out_d = self.discriminator(self.x, self.d_keep_prob)
             scope.reuse_variables()
-            self.out_dg = self.discriminator(self.G, self.keep_prob)
+            self.out_dg = self.discriminator(self.G, self.d_keep_prob)
 
         self.G_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'G/')
         self.D_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'D/')
@@ -62,7 +71,9 @@ class GanModel(object):
         self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg))
         self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg))
 
-    def train(self, sess, data, log_dir):
+        self.saver = tf.train.Saver()
+
+    def train(self, sess, data, log_dir, vis_dir):
         # Define training steps
         train_D_step = tf.train.AdamOptimizer(
             learning_rate=self.learning_rate,
@@ -88,10 +99,7 @@ class GanModel(object):
 
         # Create a plot to display progress
         plt.ion()
-        x_grid = np.empty([0,2])
-        for y in np.arange(-2, 2, 0.1):
-            for x in np.arange(-2, 2, 0.1):
-                x_grid = np.append(x_grid, [[x,y]], axis=0)
+        
 
         # Training loop
         for step in xrange(self.iterations):
@@ -127,19 +135,26 @@ class GanModel(object):
                 print(" {}: G_loss: {}, D_loss: {}".format(step, G_loss, D_loss))
 
             # Scatter plot the generator
-            if (step % 50 == 0):
-                feed_dict = {self.x: x_grid,
-                             self.d_keep_prob: 1}
-                D = sess.run([self.out_d], feed_dict=feed_dict)
-                D_img = np.reshape(D, [40,40])
+            if (step % 10 == 0):
+                self._vis_step(sess, step, G, vis_dir)
 
-                plt.clf()
-                plt.imshow(D_img, origin='lower', extent=(-2, 2, -2, 2))
-                plt.plot(G[:,0], G[:,1], 'o')
-                plt.xlim(-2, 2)
-                plt.ylim(-2, 2)
-                plt.draw()
+    def _vis_step(self, sess, step, G, vis_dir):
+        feed_dict = {self.x: self.x_grid,
+                     self.d_keep_prob: 1}
+        D = sess.run([self.out_d], feed_dict=feed_dict)
+        D_img = np.reshape(D, [40,40])
 
+        plt.clf()
+        plt.imshow(D_img, cmap=plt.get_cmap('coolwarm'), origin='lower',
+                   extent=(-2, 2, -2, 2))
+        # plt.plot(G[:,0], G[:,1], color='green', marker='o',
+        #             markeredgecolor='black', markeredgewidth=1.0)
+        plt.plot(G[:,0], G[:,1], 'go')
+        plt.xlim(-2, 2)
+        plt.ylim(-2, 2)
+        if (vis_dir != ''):
+            plt.savefig(vis_dir + "/step_{}.png".format(step/10))
+        plt.draw()
 
     def generate(self, sess, n):
         z = np.random.uniform(size=[n, self.z_dim], low=0, high=1)
