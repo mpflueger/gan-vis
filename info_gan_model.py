@@ -35,9 +35,11 @@ class InfoGanModel(GanModel):
         with tf.variable_scope('D') as scope:
             self.x = tf.placeholder(tf.float32, shape=[None, self.x_dim])
             self.d_keep_prob = tf.placeholder(tf.float32)
-            self.out_d = self.discriminator(self.x, self.keep_prob)
+            (self.out_d, self.out_d_logit) = \
+                self.discriminator(self.x, self.d_keep_prob)
             scope.reuse_variables()
-            self.out_dg = self.discriminator(self.G, self.keep_prob)
+            (self.out_dg, self.out_dg_logit) = \
+                self.discriminator(self.G, self.d_keep_prob)
 
         with tf.variable_scope('Q'):
             self.Q_logit = self.code_detector(self.G, self.c_dim)
@@ -49,11 +51,13 @@ class InfoGanModel(GanModel):
         self.Q_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'Q/')
 
         # Define loss functions
-        self.D_loss = tf.reduce_mean(-tf.log(self.out_d) - tf.log(1 - self.out_dg))
+        self.D_loss = tf.reduce_mean(
+            -tf.log(self.out_d) - tf.log(1 - self.out_dg))
 
         #self.Q_entropy = -self.lambda_q * tf.reduce_sum(
         #    self.Q_prob * tf.log(self.Q_prob), 1)
-        self.LI = self.lambda_q * tf.reduce_sum(self.c * tf.log(self.Q_prob), 1)
+        self.LI = self.lambda_q \
+            * tf.reduce_sum(self.c * tf.log(self.Q_prob), 1)
         self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg) - self.LI)
         self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg) - self.LI)
 
@@ -80,7 +84,7 @@ class InfoGanModel(GanModel):
         # Create the Saver now that all variables are in place
         self.saver = tf.train.Saver()
 
-    def train(self, sess, data, log_dir, vis_dir):
+    def train(self, sess, data, log_dir, vis_dir, d_keep_prob=1.0, seed=None):
         # Init variables
         sess.run(tf.global_variables_initializer())
 
@@ -116,7 +120,7 @@ class InfoGanModel(GanModel):
                 feed_dict = {self.x: batch_x,
                              self.z: batch_z,
                              self.c: batch_c,
-                             self.d_keep_prob: self.keep_prob}
+                             self.d_keep_prob: d_keep_prob}
                 D_loss, _ = sess.run([self.D_loss, self.train_D_step],
                                      feed_dict=feed_dict)
 
@@ -127,7 +131,7 @@ class InfoGanModel(GanModel):
             feed_dict = {self.x: batch_x,
                          self.z: batch_z,
                          self.c: batch_c,
-                         self.d_keep_prob: self.keep_prob}
+                         self.d_keep_prob: d_keep_prob}
             Q_loss, _ = sess.run([self.Q_loss, self.train_Q_step],
                                  feed_dict=feed_dict)
 
@@ -138,7 +142,7 @@ class InfoGanModel(GanModel):
             feed_dict = {self.x: batch_x,
                          self.z: batch_z,
                          self.c: batch_c,
-                         self.d_keep_prob: self.keep_prob}
+                         self.d_keep_prob: d_keep_prob}
             G_loss, _, G = sess.run(
                 [self.G_loss_alt, self.train_G_step, self.G],
                 feed_dict=feed_dict)

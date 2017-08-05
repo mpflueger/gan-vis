@@ -1,3 +1,7 @@
+"""Provide the model for a standard GAN
+Author: Max Pflueger
+"""
+
 import matplotlib.pyplot as plt
 from matplotlib.colors import Colormap
 import numpy as np
@@ -6,7 +10,7 @@ import tensorflow as tf
 import tf_helpers as tfh
 
 class GanModel(object):
-    def __init__(self):
+    def __init__(self, g_keep_prob=1.0):
         # Data params
         self.x_dim = 2
         self.z_dim = 10
@@ -15,7 +19,7 @@ class GanModel(object):
         self.k = 1
         self.iterations = 100000
         self.batch_size = 50
-        self.keep_prob = 1
+        self.g_keep_prob = g_keep_prob
         self.learning_rate = 1e-4
 
         # Adam Optimizer parameters 
@@ -32,24 +36,24 @@ class GanModel(object):
 
         self._create_model()
 
-    def generator(self, z):
-        fc1 = tf.nn.relu(tfh.fc_layer("gen_fc1", 100, z))
-        fc2 = tf.nn.relu(tfh.fc_layer("gen_fc2", 100, fc1))
-        #fc2 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("gen_fc2", 100, fc1)), 0.5)
-        #fc3 = tf.nn.relu(tfh.fc_layer("gen_fc3", 100, fc2))
-        x = tfh.fc_layer("gen_out", self.x_dim, fc2)
-        return x
+    def generator(self, z, keep_prob=1.0):
+        gen = tf.nn.relu(tfh.fc_layer("gen_fc1", 100, z))
+        gen = tf.nn.relu(tfh.fc_layer("gen_fc2", 100, gen))
+        gen = tf.nn.dropout(gen, keep_prob)
+        #gen = tf.nn.relu(tfh.fc_layer("gen_fc3", 100, gen))
+        gen = tfh.fc_layer("gen_out", self.x_dim, gen)
+        return gen
 
-    def discriminator(self, x, keep_prob):
-        fc1 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc1", 30, x)),
-                           keep_prob)
-        fc2 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc2", 40, fc1)),
-                           keep_prob)
-        fc3 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc3", 30, fc2)),
-                           keep_prob)
-        y_logit = tfh.fc_layer("desc_out", 1, fc3)
+    def discriminator(self, x, keep_prob=1.0):
+        d = tf.nn.relu(tfh.fc_layer("desc_fc1", 30, x))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer("desc_fc2", 40, d))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer("desc_fc3", 30, d))
+        d = tf.nn.dropout(d, keep_prob)
+        y_logit = tfh.fc_layer("desc_out", 1, d)
         y_prob = tf.nn.sigmoid(y_logit)
-        return y_prob
+        return (y_prob, y_logit)
 
     def _create_model(self):
         # Define the GAN network
@@ -60,20 +64,25 @@ class GanModel(object):
         with tf.variable_scope('D') as scope:
             self.x = tf.placeholder(tf.float32, shape=[None, self.x_dim])
             self.d_keep_prob = tf.placeholder(tf.float32)
-            self.out_d = self.discriminator(self.x, self.d_keep_prob)
+            (self.out_d, self.out_d_logit) = \
+                self.discriminator(self.x, self.d_keep_prob)
             scope.reuse_variables()
-            self.out_dg = self.discriminator(self.G, self.d_keep_prob)
+            (self.out_dg, self.out_dg_logit) = \
+                self.discriminator(self.G, self.d_keep_prob)
 
         self.G_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'G/')
         self.D_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'D/')
 
-        self.D_loss = tf.reduce_mean(-tf.log(self.out_d) - tf.log(1 - self.out_dg))
+        print("shapes: {}, {}".format(tf.shape(self.out_d),
+          tf.shape(self.out_dg)))
+        self.D_loss = tf.reduce_mean(
+            -tf.log(self.out_d) - tf.log(1 - self.out_dg))
         self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg))
         self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg))
 
         self.saver = tf.train.Saver()
 
-    def train(self, sess, data, log_dir, vis_dir):
+    def train(self, sess, data, log_dir, vis_dir, d_keep_prob=1.0, seed=None):
         # Define training steps
         train_D_step = tf.train.AdamOptimizer(
             learning_rate=self.learning_rate,
@@ -87,6 +96,8 @@ class GanModel(object):
             .minimize(self.G_loss_alt, var_list=self.G_vars)
 
         # Init variables
+        if (seed):
+            tf.set_random_seed(seed)
         sess.run(tf.global_variables_initializer())
 
         # Init summary data
@@ -110,20 +121,30 @@ class GanModel(object):
                 batch_x = data.get_batch(self.batch_size)
 
                 # Sample z batch
-                batch_z = np.random.uniform(size=[self.batch_size, self.z_dim], low=0, high=1)
+                batch_z = np.random.uniform(
+                    size=[self.batch_size, self.z_dim],
+                    low=0,
+                    high=1)
 
                 # Update discriminator
                 feed_dict = {self.x: batch_x,
                              self.z: batch_z,
-                             self.d_keep_prob: self.keep_prob}
-                D_loss, _ = sess.run([self.D_loss, train_D_step], feed_dict=feed_dict)
+                             self.d_keep_prob: d_keep_prob}
+                D_loss, _ = sess.run(
+                    [self.D_loss, train_D_step],
+                    feed_dict=feed_dict)
 
             # Update generator
-            batch_z = np.random.uniform(size=[self.batch_size, self.z_dim], low=0, high=1)
+            batch_z = np.random.uniform(
+                size=[self.batch_size, self.z_dim],
+                low=0,
+                high=1)
             feed_dict = {self.x: batch_x,
                          self.z: batch_z,
-                         self.d_keep_prob: self.keep_prob}
-            G_loss, _, G = sess.run([self.G_loss_alt, train_G_step, self.G], feed_dict=feed_dict)
+                         self.d_keep_prob: d_keep_prob}
+            G_loss, _, G = sess.run(
+                [self.G_loss_alt, train_G_step, self.G],
+                feed_dict=feed_dict)
 
             # Log progress
             if (step % 20 == 0):
@@ -132,7 +153,8 @@ class GanModel(object):
 
             # Give a periodic update
             if (step % 100 == 0):
-                print(" {}: G_loss: {}, D_loss: {}".format(step, G_loss, D_loss))
+                print(" {}: G_loss: {}, D_loss: {}".format(
+                  step, G_loss, D_loss))
 
             # Scatter plot the generator
             if (step % 10 == 0):
