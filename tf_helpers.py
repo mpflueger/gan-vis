@@ -17,10 +17,16 @@ def bias_variable(shape):
         #initializer=tf.constant_initializer(0.01))
         initializer=tf.contrib.layers.xavier_initializer())
 
-def fc_layer(name, units, input):
+def fc_layer(name, units, x):
     with tf.variable_scope(name):
-        weights = weight_variable([int(input.get_shape()[1]), units])
-        bias = bias_variable([units])
-        h = tf.matmul(input, weights) + bias
-        return h
+        w = weight_variable([int(x.get_shape()[1]), units])
+        b = bias_variable([units])
+        return tf.matmul(x, w) + b
+
+def fc_layer_clipped(name, units, x, c_min, c_max):
+    with tf.variable_scope(name):
+        w = weight_variable([int(x.get_shape()[1]), units])
+        w = tf.clip_by_value(w, c_min, c_max)
+        b = bias_variable([units])
+        return tf.matmul(x, w) + b
 
