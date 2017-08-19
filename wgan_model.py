@@ -7,12 +7,27 @@ from gan_model import GanModel
 
 class WGanModel(GanModel):
     def __init__(self):
-        self.clip = 0.01
+        self.clip = 0.1
 
         # Coefficient for generator loss on entropy from Q
         GanModel.__init__(self)
 
         self.k = 5
+
+    """
+    The Wasserstein GAN critic
+    Similar to a discriminator with clipped weights
+    """
+    def critic(self, x, clip, keep_prob=1.0):
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc1", 30, x, -clip, clip))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc2", 40, d, -clip, clip))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc3", 30, d, -clip, clip))
+        d = tf.nn.dropout(d, keep_prob)
+        y_logit = tfh.fc_layer_clipped("critic_out", 1, d, -clip, clip)
+        y_prob = tf.nn.sigmoid(y_logit)
+        return (y_prob, y_logit)
 
     def _create_model(self):
         # Define the GAN network
@@ -23,9 +38,11 @@ class WGanModel(GanModel):
         with tf.variable_scope('D') as scope:
             self.x = tf.placeholder(tf.float32, shape=[None, self.x_dim])
             self.d_keep_prob = tf.placeholder(tf.float32)
-            (self.out_d, self.out_d_logit) = self.discriminator(self.x, self.keep_prob)
+            (self.out_d, self.out_d_logit) \
+                = self.critic(self.x, self.clip, self.d_keep_prob)
             scope.reuse_variables()
-            (self.out_dg, self.out_dg_logit) = self.discriminator(self.G, self.keep_prob)
+            (self.out_dg, self.out_dg_logit) \
+                = self.critic(self.G, self.clip, self.d_keep_prob)
 
         # Define our separate sets of trainable variables
         self.G_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'G/')
@@ -47,11 +64,14 @@ class WGanModel(GanModel):
             beta1 = self.beta1,
             beta2 = self.beta2) \
             .minimize(self.G_loss, var_list=self.G_vars)
-        
+
         # Create the Saver now that all variables are in place
         self.saver = tf.train.Saver()
 
-    def train(self, sess, data, log_dir, vis_dir):
+    def train(self, sess, data, log_dir, vis_dir, d_keep_prob=1.0, seed=None):
+        if seed:
+            raise ValueError("seed is not an implemented input for train")
+
         # Init variables
         sess.run(tf.global_variables_initializer())
 
@@ -85,20 +105,16 @@ class WGanModel(GanModel):
                 # Update discriminator
                 feed_dict = {self.x: batch_x,
                              self.z: batch_z,
-                             self.d_keep_prob: self.keep_prob}
+                             self.d_keep_prob: d_keep_prob}
                 D_loss, _ = sess.run([self.D_loss, self.train_D_step],
                                      feed_dict=feed_dict)
-
-                # Clip discriminator weights
-                for var in self.D_vars:
-                    var = tf.clip_by_value(var, -self.clip, self.clip)
 
             # Update generator
             batch_z = np.random.uniform(
                 size=[self.batch_size, self.z_dim], low=0, high=1)
             feed_dict = {self.x: batch_x,
                          self.z: batch_z,
-                         self.d_keep_prob: self.keep_prob}
+                         self.d_keep_prob: d_keep_prob}
             G_loss, _, G = sess.run(
                 [self.G_loss, self.train_G_step, self.G],
                 feed_dict=feed_dict)
@@ -122,4 +138,4 @@ class WGanModel(GanModel):
         c_onehot = np.zeros([batch_size, c_dim])
         c_onehot[np.arange(batch_size), c_ints] = 1
         return c_onehot
-    
+
