@@ -110,7 +110,6 @@ class GanModel(object):
 
         # Create a plot to display progress
         plt.ion()
-        
 
         # Training loop
         for step in xrange(self.iterations):
@@ -176,6 +175,8 @@ class GanModel(object):
         plt.ylim(-2, 2)
         if (vis_dir != ''):
             plt.savefig(vis_dir + "/step_{}.png".format(step/10))
+
+        plt.gca().text(-1.9, -1.9, "step {}".format(step))
         plt.draw()
 
     def generate(self, sess, n):
