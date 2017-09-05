@@ -1,3 +1,7 @@
+"""Provide the model for an InfoGAN
+Author: Max Pflueger
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -15,14 +19,14 @@ class InfoGanModel(GanModel):
         GanModel.__init__(self)
 
     def code_detector(self, x, codes):
-        fc1 = tf.nn.relu(tfh.fc_layer("desc_fc1", 40, x))
-        #fc1 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc1", 30, x)), 0.5)
-        fc2 = tf.nn.relu(tfh.fc_layer("desc_fc2", 40, fc1))
-        #fc2 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc2", 30, fc1)), 0.5)
-        #fc3 = tf.nn.relu(tfh.fc_layer("desc_fc3", 30, fc2))
-        #fc3 = tf.nn.dropout(tf.nn.relu(tfh.fc_layer("desc_fc3", 30, fc2)), 0.5)
-        y_logit = tfh.fc_layer("desc_out", codes, fc2)
-        return y_logit
+        cd = tf.nn.relu(tfh.fc_layer("cd_fc1", 40, x))
+        #cd = tf.nn.dropout(cd, 0.5)
+        cd = tf.nn.relu(tfh.fc_layer("cd_fc2", 40, cd))
+        #cd = tf.nn.dropout(cd, 0.5)
+        #cd = tf.nn.relu(tfh.fc_layer("cd_fc3", 30, cd)
+        #cd = tf.nn.dropout(cd, 0.5)
+        logit = tfh.fc_layer("cd_out", codes, cd)
+        return logit
 
     def _create_model(self):
         # Define the GAN network
@@ -85,6 +89,9 @@ class InfoGanModel(GanModel):
         self.saver = tf.train.Saver()
 
     def train(self, sess, data, log_dir, vis_dir, d_keep_prob=1.0, seed=None):
+        if seed:
+            raise ValueError("seed is not an implemented input for train")
+        
         # Init variables
         sess.run(tf.global_variables_initializer())
 
