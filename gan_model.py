@@ -37,19 +37,23 @@ class GanModel(object):
         self._create_model()
 
     def generator(self, z, keep_prob=1.0):
-        gen = tf.nn.relu(tfh.fc_layer("gen_fc1", 100, z))
-        gen = tf.nn.relu(tfh.fc_layer("gen_fc2", 100, gen))
+        gen = tf.nn.relu(tfh.fc_layer("gen_fc1", 50, z))
         gen = tf.nn.dropout(gen, keep_prob)
-        #gen = tf.nn.relu(tfh.fc_layer("gen_fc3", 100, gen))
+        gen = tf.nn.relu(tfh.fc_layer("gen_fc2", 50, gen))
+        gen = tf.nn.dropout(gen, keep_prob)
+        gen = tf.nn.relu(tfh.fc_layer("gen_fc3", 50, gen))
+        gen = tf.nn.dropout(gen, keep_prob)
         gen = tfh.fc_layer("gen_out", self.x_dim, gen)
         return gen
 
     def discriminator(self, x, keep_prob=1.0):
-        d = tf.nn.relu(tfh.fc_layer("desc_fc1", 30, x))
+        d = tf.nn.relu(tfh.fc_layer("desc_fc1", 50, x))
         d = tf.nn.dropout(d, keep_prob)
-        d = tf.nn.relu(tfh.fc_layer("desc_fc2", 40, d))
+        d = tf.nn.relu(tfh.fc_layer("desc_fc2", 50, d))
         d = tf.nn.dropout(d, keep_prob)
-        d = tf.nn.relu(tfh.fc_layer("desc_fc3", 30, d))
+        d = tf.nn.relu(tfh.fc_layer("desc_fc3", 50, d))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer("desc_fc4", 50, d))
         d = tf.nn.dropout(d, keep_prob)
         y_logit = tfh.fc_layer("desc_out", 1, d)
         y_prob = tf.nn.sigmoid(y_logit)
@@ -83,6 +87,9 @@ class GanModel(object):
         self.saver = tf.train.Saver()
 
     def train(self, sess, data, log_dir, vis_dir, d_keep_prob=1.0, seed=None):
+        if seed:
+            raise ValueError("seed is not an implemented input for train")
+
         # Define training steps
         train_D_step = tf.train.AdamOptimizer(
             learning_rate=self.learning_rate,
@@ -96,8 +103,11 @@ class GanModel(object):
             .minimize(self.G_loss_alt, var_list=self.G_vars)
 
         # Init variables
-        if (seed):
-            tf.set_random_seed(seed)
+        # Seeding doesn't seem to work, commenting for now
+        # if seed:
+        #     with tf.Graph().as_default():
+        #         tf.set_random_seed(seed)
+        #         np.random.seed(seed + 1)
         sess.run(tf.global_variables_initializer())
 
         # Init summary data
@@ -166,17 +176,26 @@ class GanModel(object):
         D_img = np.reshape(D, [40,40])
 
         plt.clf()
+
+        # Plot the discriminator image
         plt.imshow(D_img, cmap=plt.get_cmap('coolwarm'), origin='lower',
                    extent=(-2, 2, -2, 2))
         # plt.plot(G[:,0], G[:,1], color='green', marker='o',
         #             markeredgecolor='black', markeredgewidth=1.0)
+
+        # Plot the generator cluster
         plt.plot(G[:,0], G[:,1], 'go')
+
         plt.xlim(-2, 2)
         plt.ylim(-2, 2)
+
+        # Add the step number, and data mode mean values
+        plt.gca().text(-1.9, -1.9, "step {}".format(step))
+        plt.plot([1, -0.5, -0.5], [0, 0.866, -0.866], 'kx')
+
         if (vis_dir != ''):
             plt.savefig(vis_dir + "/step_{}.png".format(step/10))
 
-        plt.gca().text(-1.9, -1.9, "step {}".format(step))
         plt.draw()
 
     def generate(self, sess, n):

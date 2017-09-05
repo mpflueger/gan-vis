@@ -1,3 +1,7 @@
+"""Provide the model for a Wasserstein GAN
+Author: Max Pflueger
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -19,11 +23,13 @@ class WGanModel(GanModel):
     Similar to a discriminator with clipped weights
     """
     def critic(self, x, clip, keep_prob=1.0):
-        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc1", 30, x, -clip, clip))
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc1", 50, x, -clip, clip))
         d = tf.nn.dropout(d, keep_prob)
-        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc2", 40, d, -clip, clip))
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc2", 50, d, -clip, clip))
         d = tf.nn.dropout(d, keep_prob)
-        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc3", 30, d, -clip, clip))
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc3", 50, d, -clip, clip))
+        d = tf.nn.dropout(d, keep_prob)
+        d = tf.nn.relu(tfh.fc_layer_clipped("critic_fc4", 50, d, -clip, clip))
         d = tf.nn.dropout(d, keep_prob)
         y_logit = tfh.fc_layer_clipped("critic_out", 1, d, -clip, clip)
         y_prob = tf.nn.sigmoid(y_logit)
