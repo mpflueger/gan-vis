@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--model', type=str, default='standard',
         help="Model to train {standard, dropout, infogan, wgan}")
     parser.add_argument('--seed', type=int,
-        help="Random seed for repeatable behavior")
+        help="Random seed for repeatable behavior (not implemented)")
     return parser.parse_args()
 
 def main():
