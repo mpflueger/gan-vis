@@ -4,7 +4,7 @@ Author: Max Pflueger
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 import tf_helpers as tfh
 from gan_model import GanModel
@@ -97,7 +97,7 @@ class WGanModel(GanModel):
                 x_grid = np.append(x_grid, [[x,y]], axis=0)
 
         # Training loop
-        for step in xrange(self.iterations):
+        for step in range(self.iterations):
             # Update discriminator
             # Repeat k times (probably 1)
             for _ in range(self.k):

@@ -1,13 +1,14 @@
 """Provide helpers for GANs"""
 
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 def weight_variable(shape):
     #initial = tf.truncated_normal(shape, stddev=0.1)
     #return tf.Variable(initial, name='weight')
     return tf.get_variable('weight', shape=shape,
         #initializer=tf.truncated_normal_initializer(stddev=0.1))
-        initializer=tf.contrib.layers.xavier_initializer())
+        initializer=tf.keras.initializers.glorot_uniform())
         #initializer=tf.truncated_normal(shape, stddev=0.1))
 
 def bias_variable(shape):
@@ -15,7 +16,7 @@ def bias_variable(shape):
     #return tf.Variable(initial, name='bias')
     return tf.get_variable('bias', shape=shape,
         #initializer=tf.constant_initializer(0.01))
-        initializer=tf.contrib.layers.xavier_initializer())
+        initializer=tf.keras.initializers.glorot_uniform())
 
 def fc_layer(name, units, x):
     with tf.variable_scope(name):

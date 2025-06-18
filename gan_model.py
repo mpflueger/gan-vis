@@ -5,7 +5,8 @@ Author: Max Pflueger
 import matplotlib.pyplot as plt
 from matplotlib.colors import Colormap
 import numpy as np
-import tensorflow as tf
+from pathlib import Path
+import tensorflow.compat.v1 as tf
 
 import tf_helpers as tfh
 
@@ -29,10 +30,17 @@ class GanModel(object):
 
         # Visualization stuff
         self.x_grid = np.empty([0,2])
-        for y in np.arange(-2, 2, 0.1):
-            for x in np.arange(-2, 2, 0.1):
+        for y in np.arange(-2, 2, 0.05):
+            for x in np.arange(-2, 2, 0.05):
                 self.x_grid = np.append(self.x_grid, [[x,y]], axis=0)
-        self.cmap = Colormap('PiYG')
+        self.cmap = 'viridis'
+        plt.rcParams['figure.figsize'] = [6.0, 6.0]
+        plt.rcParams['xtick.top'] = True
+        plt.rcParams['xtick.bottom'] = True
+        plt.rcParams['ytick.left'] = True  
+        plt.rcParams['ytick.right'] = True
+        plt.rcParams['xtick.direction'] = 'in'
+        plt.rcParams['ytick.direction'] = 'in'
 
         self._create_model()
 
@@ -63,7 +71,7 @@ class GanModel(object):
         # Define the GAN network
         with tf.variable_scope('G'):
             self.z = tf.placeholder(tf.float32, shape=[None, self.z_dim])
-            self.G = self.generator(self.z)
+            self.G = self.generator(self.z, keep_prob=self.g_keep_prob)
 
         with tf.variable_scope('D') as scope:
             self.x = tf.placeholder(tf.float32, shape=[None, self.x_dim])
@@ -79,10 +87,13 @@ class GanModel(object):
 
         print("shapes: {}, {}".format(tf.shape(self.out_d),
           tf.shape(self.out_dg)))
+        eps = 1e-32  # Epsilon to avoid log(0) in log probabilities.
         self.D_loss = tf.reduce_mean(
-            -tf.log(self.out_d) - tf.log(1 - self.out_dg))
-        self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg))
-        self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg))
+            -tf.log(self.out_d + eps) - tf.log(1 - self.out_dg + eps))
+        self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg + eps))
+        # The alternative generator loss is a common variant proposed in the
+        # original GAN paper to provide better early training gradients.
+        self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg + eps))
 
         self.saver = tf.train.Saver()
 
@@ -122,7 +133,7 @@ class GanModel(object):
         plt.ion()
 
         # Training loop
-        for step in xrange(self.iterations):
+        for step in range(self.iterations):
             # Update discriminator
             # Repeat k times (probably 1)
             for _ in range(self.k):
@@ -168,23 +179,27 @@ class GanModel(object):
             # Scatter plot the generator
             if (step % 10 == 0):
                 self._vis_step(sess, step, G, vis_dir)
+        summary_writer.flush()
+        summary_writer.close()
 
     def _vis_step(self, sess, step, G, vis_dir):
         feed_dict = {self.x: self.x_grid,
                      self.d_keep_prob: 1}
         D = sess.run([self.out_d], feed_dict=feed_dict)
-        D_img = np.reshape(D, [40,40])
+        D_img = np.reshape(D, [80,80])
 
         plt.clf()
 
         # Plot the discriminator image
-        plt.imshow(D_img, cmap=plt.get_cmap('coolwarm'), origin='lower',
+        # plt.imshow(D_img, cmap=plt.get_cmap('coolwarm'), origin='lower',
+        #            extent=(-2, 2, -2, 2))
+        plt.imshow(D_img, cmap=self.cmap, origin='lower',
                    extent=(-2, 2, -2, 2))
         # plt.plot(G[:,0], G[:,1], color='green', marker='o',
         #             markeredgecolor='black', markeredgewidth=1.0)
 
         # Plot the generator cluster
-        plt.plot(G[:,0], G[:,1], 'go')
+        plt.plot(G[:,0], G[:,1], 'ro', markeredgecolor='black', markeredgewidth=1.0)
 
         plt.xlim(-2, 2)
         plt.ylim(-2, 2)
@@ -194,7 +209,9 @@ class GanModel(object):
         plt.plot([1, -0.5, -0.5], [0, 0.866, -0.866], 'kx')
 
         if (vis_dir != ''):
-            plt.savefig(vis_dir + "/step_{}.png".format(step/10))
+            save_path = Path(vis_dir + "/step_{}.png".format(int(step/10)))
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path, dpi=200, bbox_inches='tight')
 
         plt.draw()
 

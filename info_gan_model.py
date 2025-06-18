@@ -4,14 +4,14 @@ Author: Max Pflueger
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 import tf_helpers as tfh
 from gan_model import GanModel
 
 class InfoGanModel(GanModel):
-    def __init__(self):
-        self.c_dim = 20
+    def __init__(self, c_dim):
+        self.c_dim = c_dim
 
         # Coefficient for generator loss on entropy from Q
         self.lambda_q = 1
@@ -33,7 +33,7 @@ class InfoGanModel(GanModel):
         with tf.variable_scope('G'):
             self.z = tf.placeholder(tf.float32, shape=[None, self.z_dim])
             self.c = tf.placeholder(tf.float32, shape=[None, self.c_dim])
-            self.zc = tf.concat(1, [self.z, self.c])
+            self.zc = tf.concat([self.z, self.c], 1)
             self.G = self.generator(self.zc)
 
         with tf.variable_scope('D') as scope:
@@ -55,18 +55,19 @@ class InfoGanModel(GanModel):
         self.Q_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'Q/')
 
         # Define loss functions
+        eps = 1e-32  # Epsilon to avoid log(0) in log probabilities.
         self.D_loss = tf.reduce_mean(
-            -tf.log(self.out_d) - tf.log(1 - self.out_dg))
+            -tf.log(self.out_d + eps) - tf.log(1 - self.out_dg + eps))
 
         #self.Q_entropy = -self.lambda_q * tf.reduce_sum(
         #    self.Q_prob * tf.log(self.Q_prob), 1)
         self.LI = self.lambda_q \
-            * tf.reduce_sum(self.c * tf.log(self.Q_prob), 1)
-        self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg) - self.LI)
-        self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg) - self.LI)
+            * tf.reduce_sum(self.c * tf.log(self.Q_prob + eps), 1)
+        self.G_loss = tf.reduce_mean(tf.log(1 - self.out_dg + eps) - self.LI)
+        self.G_loss_alt = tf.reduce_mean(-tf.log(self.out_dg + eps) - self.LI)
 
-        self.Q_loss = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(self.Q_logit, self.c))
+        self.Q_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+                logits=self.Q_logit, labels=self.c))
 
         # Define our optimization steps
         self.train_D_step = tf.train.AdamOptimizer(
@@ -111,7 +112,7 @@ class InfoGanModel(GanModel):
                 x_grid = np.append(x_grid, [[x,y]], axis=0)
 
         # Training loop
-        for step in xrange(self.iterations):
+        for step in range(self.iterations):
             # Update discriminator
             # Repeat k times (probably 1)
             for _ in range(self.k):
