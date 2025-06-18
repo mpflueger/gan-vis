@@ -79,7 +79,7 @@ This could probably be a more complex question than I’m going to address here,
 
 $$\{D(m_1), D(m_2), D(m_3)\} \in [0,1]$$
 
-If $$G(\boldsymbol z)=m_1$$ then clearly $$D(m_2)=D(m_3)=1$$, but $$D(m_3)$$ depends on the relative weights of the training data and generator. In our problem $$m_1$$ is $$\frac{1}{3}$$ of the data and the generator and data have equal weight.  We are now solving:
+If $$G(\boldsymbol z)=m_1$$ then clearly $$D(m_2)=D(m_3)=1$$, but $$D(m_1)$$ depends on the relative weights of the training data and generator. In our problem $$m_1$$ is $$\frac{1}{3}$$ of the data and the generator and data have equal weight.  We are now solving:
 
 $$\arg\!\max_{D(m_1)} \left[ \frac{1}{3}(\log D(m_1)) + \log(1-D(m_1)) \right] = \frac{1}{4}$$
 
