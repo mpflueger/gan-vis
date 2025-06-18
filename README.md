@@ -36,4 +36,5 @@ python make_plot.py <tfevent file> [--save-path=FILE_PATH] [--max-steps=STEPS]
 
 ## Dataset
 `data3.csv` is a pregenerated 2D dataset with 3 modes distributed around the unit circle. See the density plot below:
+
 <img src="data3_density.png" width="400px"/>
