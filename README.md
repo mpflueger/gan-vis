@@ -1,3 +1,5 @@
+Article: [Visualizing Adversarial Learning](https://mpflueger.github.io/gan-vis/)
+
 # GAN Vis
 
 A Generative Adversarial Network with a synthetic, multimodal, 2D data set.
