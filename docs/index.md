@@ -10,9 +10,11 @@ Author: Max Pflueger
 Original draft: July 2017<br/>
 Published: June 2025
 
+Code: [gan-vis](https://github.com/mpflueger/gan-vis)
+
 ![Infogan20 step 303 cropped](assets/infogan_c20_step_303_crop.png){: .center width="300px"}
 
-*Author’s Note: I largely wrote this in 2017, but didn’t publish it at the time.  Reviewing now in 2025 some things have changed (to say the least), but I still think there is value in looking at some of these older more basic techniques.  I’ve decided to preserve what I wrote then, editing for clarity and correctness, even where some of it may seem anachronistic. I've rerun all the experiments to verify everything reproduces and also added a bit where a thought more explanation was needed.*
+*Author’s Note: I largely wrote this in 2017, but didn’t publish it at the time.  Reviewing now in 2025 some things have changed (to say the least), but I still think there is value in looking at some of these older more basic techniques.  I’ve decided to preserve what I wrote then, editing for clarity and correctness, even where some of it may seem anachronistic. I've rerun all the experiments to verify everything reproduces and also added a bit where I thought more explanation was needed.*
 
 I’ve been playing with Generative Adversarial Nets (GANs) a bit lately, and as probably anyone who has used them knows, training is tricky.  In particular, I wanted to understand what was happening when my network didn’t capture the variety of my data.  Fortunately, if you synthesize a low dimensional data set, it is possible to make some nice visualizations and animations of what the network, or networks rather, do as they are training.
 
@@ -37,7 +39,7 @@ $$
 
 There are a couple variants on how to do that optimization, but the most basic approach is to take a gradient step on the weights of $$D$$, and then a gradient step on the weights of $$G$$, and repeat.  **What happens when we do that optimization is what this article is all about.**  In practice, adversarial training can be unstable, or it can get stuck in local minima.  To understand what that means, why it happens (at least to some extent), and what we might do about it, I made the visualizations below.  I found them illuminating, and I hope you will too.
 
-For a more thorough explanation of GANs you can read the original paper by Ian Goodfellow \[[Goodfellow et. al.](https://arxiv.org/abs/1406.2661)\], and when you have grip on the basics, you could check out the [GAN Zoo](https://github.com/hindupuravinash/the-gan-zoo) to see how many variants there are I haven’t discussed or visualized here (the answer is a lot).
+For a more thorough explanation of GANs you can read the original paper by Ian Goodfellow \[[Goodfellow et. al.](https://arxiv.org/abs/1406.2661)\], and when you have grip on the basics, you could check out the [GAN Zoo](https://github.com/hindupuravinash/the-gan-zoo) to see how many variants there are that I haven’t discussed or visualized here (the answer is a lot).
 
 
 # Visualizing Training
@@ -50,7 +52,7 @@ To train the GANs in the visualizations below, I used a synthetic data set desig
 ## Visualization
 I made the visualizations below to help understand the GAN training process.  In particular, I wanted to be able to see the behavior of both the generator and discriminator.  
 
-In the state space of our synthetic training data, the discriminator is a function D:R<sup>2</sup>->(0,1), which means we can fully visualize its behavior by mapping each pixel to a color according to what D would say about a data point in the position of that pixel.  Then, to understand the distribution of data being produced by the generator we plot all its samples from a single batch directly onto the decision surface of the discriminator.  This means that for each frame we get to see both what the distribution looks like coming out of the generator, how well that is conforming to what the discriminator thinks real data looks like, and (if we remember what our synthetic data looks like) how well both of those match the actual distribution of the training data.
+In the state space of our synthetic training data, the discriminator is a function $$D:\mathbb{R}^2\to(0,1)$$, which means we can fully visualize its behavior by mapping each pixel to a color according to what $$D$$ would say about a data point in the position of that pixel.  Then, to understand the distribution of data being produced by the generator we plot all its samples from a single batch directly onto the decision surface of the discriminator.  This means that for each frame we get to see both what the distribution looks like coming out of the generator, how well that is conforming to what the discriminator thinks real data looks like, and (if we remember what our synthetic data looks like) how well both of those match the actual distribution of the training data.
 
 Obviously, this technique only works because we are using data from a 2-dimensional state space.  Most interesting applications of GANs happen on complex, high dimensional data like images, but hopefully, by starting small, we can get some insight into the dynamics of adversarial training.
 
@@ -59,17 +61,19 @@ I used python and TensorFlow to create these visualizations, and you can find th
 
 Also note that these algorithms have a lot of hyperparameters, some explicit, some less so.  I tried to pick typical values to produce interesting behavior, but have not done an exhaustive parameter sweep by any means.  If you are curious I encourage you to pick up the code, change something, and see what you see!
 
-## Vanilla GAN
-Our first contender is a vanilla GAN with no fancy modifications.  In the video below you will see how the generator ‘collapses’ onto a single mode of the data, and ignores the others.  The phenomenon of ‘mode collapse’ is an important form of local minimum where the generator only produces samples that look like a subset of the training data.  The visualization below should help us get an intuitive understanding of how and why this happens.
+## Standard GAN
+Our first contender is a standard GAN with no fancy modifications.  In the video below you will see how the generator ‘collapses’ onto a single mode of the data, and ignores the others.  The phenomenon of ‘mode collapse’ is an important form of local minimum where the generator only produces samples that look like a subset of the training data.  The visualization below should help us get an intuitive understanding of how and why this happens.
 
 ```shell
 python train.py --model=standard --log-dir=vis_standard --vis-dir=vis_standard/steps
-python make_plot.py vis_standard/...
+python make_plot.py vis_standard/[event file]
 ffmpeg -r 30 -i vis_standard/steps/step_%d.png -c:v libvpx-vp9 -crf 30 -b:v 0 -pix_fmt yuv420p standard.webm
 ```
 ![Losses for Vanilla GAN](assets/standard_loss_plot_40k.png){: .center}
 {% include video.html src="assets/vis_standard_40k.webm" %}
-**Note: These videos are long, but the interesting bits are very short and spread throughout. I recommend scrubbing through to find the steps where things change.**
+*Animation for standard GAN configuration. Note how the behavior at various steps aligns with the training loss curves above.*
+
+**Note: Some of these videos are long, but the interesting bits are very short and spread throughout. I recommend scrubbing through to find the steps where things change.**
 
 We see that the generator essentially ‘chases’ the discriminator around the space, but it only knows where to go based on the samples it has produced, this is adversarial gradient descent at work.  Once it has calmed down the generator is usually producing data that looks like one of the three modes, and getting some reward for doing so, but has no gradient to spread out.  Sometimes (randomly) the generator will manage to split its distribution and capture two modes at once, but I have yet to see it grab all three.  
 
@@ -93,13 +97,12 @@ python train.py --model=dropout --log-dir=vis_dropout --vis-dir=vis_dropout/step
 ```
 ![Losses for dropout](assets/dropout_v4_30k_loss_plot.png){: .center}
 {% include video.html src="assets/dropout_v4_30k.webm" %}
-*[TODO: is this redundant with main text?] The network noise caused by dropout causes the generator to produce a wider distribution than in the standard model, but in this run it still only manages to capture a single mode of the data distribution.*
 
 As with all the examples in this article, this plays out a little different every time, but we do see the dropout noise causing the generator distribution to spread a lot more early in training.  Unfortunately, most of the time it still only captures a single mode (at least with the parameter settings I’m using here).
 
 ## InfoGAN
 Next, lets try a technique called InfoGAN \[[Chen et. al.](https://arxiv.org/pdf/1606.03657.pdf)\]. 
-InfoGAN introduces a new input variable $$c$$ and modifies the generator loss function to also maximize mutual information with $$c$$, which is done by adding a network $$Q$$ that attempts to predict $$c$$ from the output of $$G$$.  Theoretically there are no constraints on the distribution of $$c$$, for our problem we make it a categorical one-hot variable.
+InfoGAN introduces a new input variable $$c$$ and modifies the generator loss function to also maximize mutual information with $$c$$. This is done by adding a network $$Q$$ that attempts to predict $$c$$ from the output of $$G$$. Essentially, if we know where a sample point is, we should know what value of $$c$$ produced it.  Theoretically there are no constraints on the distribution of $$c$$; for our problem we make it a categorical one-hot variable.
 With categorical modes, this will essentially force the generator to produce separable modes according to the input $$c$$ variable.  
 
 We will have to choose the dimension of $$c$$ (number of categories) beforehand, which becomes another hyperparameter in our training process.  Choosing reasonable distributions for $$c$$ should be easy with our synthetic data, but it might be more difficult if we are dealing with a complex, high dimensional data set; but one problem at a time!  In the next example, we gave $$c$$ dimension of 3:
@@ -110,15 +113,16 @@ python train.py --model=infogan --c=3 --log-dir=vis_infogan_c3 --vis-dir=vis_inf
 ```
 ![Losses for InfoGAN at c=3](assets/infogan_c3_v2_50k_loss_plot.png){: .center}
 {% include video.html src="assets/infogan_c3_v2_50k.webm" %}
-*REVIEW NOTE: is it worth keeping this video?*
+*This one works exactly as we want, the three generator modes immediately split apart and capture the three data modes.*
 
 ![Losses for InfoGAN at c=3](assets/infogan_c3_v4_loss_plot.png){: .center}
 {% include video.html src="assets/infogan_c3_v4.webm" %}
+*This run is less ideal, two of the generator modes get stuck on one data mode for a while, though they did eventually shake apart around step 71000.*
 
 Cool! With $$c=3$$, sometimes the generator will immediately split out to capture all 3 modes, but that isn’t always the case, as we see above. Two of the generator modes got stuck on one of the data modes for quite a while, and eventually, around step 71000, got shaken loose by random noise. (This noise arrives in the form of random samples drawn from the data distribution and random samples from the generator, both of which feed to the discriminator gradient updates.)  It is worth considering though, that if we had just been looking at the loss plot, we might have already stopped training by that point, as it would have looked stagnant for a while.  Maybe we can reduce the chances of missing a mode by increasing $$c$$ to 6 modes:
 
 ### Runs at $$c=6$$
-By increasing the generator modes to 6 we increase the odds that all modes of the data will be captured, but even in an ideal case where 2 generator modes attach to each data mode, this will not be a good model of the data due to the cost function that tries to keep the generator modes separable.  We see that the discriminator attempts to exploit this by selecting the region between each pair of generator modes that have attached to data mode.  In other cases we could see one data mode with 3 generator modes, and another with 1, and this will make the data representation of the generator even worse.  Remember that this model cannot learn the relative weights of the generator modes (values of $$c$$), so if our different data modes have weights that are different from our generator modes, the generator cannot match this through learning.
+By increasing the generator modes to 6 we increase the odds that all modes of the data will be captured, but even in an ideal case where 2 generator modes attach to each data mode, this will not be a good model of the data due to the cost function that tries to keep the generator modes separable.  We see that the discriminator attempts to exploit this by selecting the region between each pair of generator modes that have attached to a data mode.  In other cases we could see one data mode with 3 generator modes, and another with 1, and this will make the data representation of the generator even worse.  Remember that this model cannot learn the relative weights of the generator modes (values of $$c$$), so if our different data modes have weights that are different from our generator modes, the generator cannot match this through learning.
 
 Here we see two different ways this can turn out (there are probably more, but these are the ones I see most often), so we are back to the point of having to be a little lucky in the training process.
 
@@ -131,7 +135,7 @@ python train.py --model=infogan --c=6 --log-dir=vis_infogan_c6 --vis-dir=vis_inf
 
 ![Losses for InfoGAN at c=6](assets/infogan_c6_v5_30k_loss_plot.png){: .center}
 {% include video.html src="assets/infogan_c6_v5_30k.webm" %}
-*There is no guarantee of getting an even assignment of generator modes to data modes, as we see in this run with the same settings as above.*
+*There is no guarantee of getting an even assignment of generator modes to data modes, as we see in this run with the same settings as above, where 3 generator modes attach to one data mode, and only one to another.*
 
 ### Runs at $$c=20$$
 Making $$c$$ substantially larger than the number of modes of our data could be an approximate mitigation to the issues above, here are a couple training runs with $$c=20$$:
@@ -162,6 +166,8 @@ python train.py --model=wgan --log-dir=vis_wgan --vis-dir=vis_wgan/steps
 {% include video.html src="assets/wgan_v1.webm" %}
 *Training the Wasserstein GAN.  By contrast to the other models here we see the generator spread and bifurcate to capture multiple modes of the data.  The discriminator (critic) field also has visually different contours than in the other models.*
 
+Compared to our other models, WGAN seems to take more steps to find a stable and good looking generator distribution.  I suspect this is because it is mathematically more 'difficult' to form a function that takes smooth noise and bi- or tri-furcates it into multiple distinct modes.  We see through the early training steps the generator distribution spreads apart quickly and then takes a long time to push the distributional mass out of the middle.
+
 # Conclusion
 These models all still have some issues, for example in most cases the generator does not appear to be particularly stable during training.  Even in models that capture all the modes, those modal distributions can move around a lot randomly.  It is also not clear if they are accurately capturing the shape of each individual data mode.  We can perhaps imagine a number of tweaks to address these issues, such as tweaking the relative updates of $$G$$ and $$D$$, learning rate decay, etc., but that would introduce more hyperparameters that would have to be tuned for each application.  Unsurprisingly then, there are many other approaches in the literature for helping GANs get good results.  If I end up implementing them, perhaps I will update this post later.
 
@@ -173,6 +179,6 @@ I haven’t seen people using GANs much lately, but I think there are a couple l
 
 A second lesson is regarding the artifacts of network architecture, observed through the shapes produced by the discriminator.  My code uses the relu non-linearity, which makes the surface of the discriminator piecewise-linear, and sometimes we see shapes that hint at this.  Furthermore, we see that the discriminator doesn’t learn anything it doesn’t have to, so anything outside the range of the generator samples or data samples is just noise shaped by our inductive biases (non-linearities, architectures, initializations, etc.).  This should offer some insight any time we ask an ML model to ‘extrapolate’ beyond the range of what has been seen in training.
 
-Finally, as we look at these learning architectures, we see a number of issues, like mode distributions in InfoGAN, that cannot be fixed by simply making the model larger.  The field of machine learning has seen many significant breakthroughs that appeared to be a result of simply having more compute or more data, but just as often we see issues that bigness cannot fix, and require us to develop an understanding of the underlying mechanisms and dynamics of our algorithms.
+Finally, as we look at these learning architectures, we see a number of issues, like the relative weights of modes in InfoGAN, that cannot be fixed by simply making the model larger.  The field of machine learning has seen many significant breakthroughs that appeared to be a result of simply having more compute or more data, but just as often we see issues that bigness cannot fix, and require us to develop an understanding of the underlying mechanisms and dynamics of our algorithms.
 
 I hope you found this interesting, and if you’d like to ask questions or talk about it feel free to contact me via email or social media.
